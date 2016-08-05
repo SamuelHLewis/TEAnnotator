@@ -21,10 +21,14 @@ def RepeatMaskerRunner(infile,cores=1,species='Metazoa',customlib=''):
 	# run RepeatMasker (NB: E.coli insert check turned off)
 	# if customlib not specified, find TEs according to species
 	if customlib=='':
+		# set outfile name early to reflect its origin from customlib
+		outfile = infile.replace('.fas','_customlib_TE.gff')
 		cmd = 'RepeatMasker -pa ' + str(cores) + ' -no_is -species \"' + species + '\" -x -gff -a ' + infile
 		subprocess.call(cmd,shell=True)
 	# if a custom repeat library is specified, find TEs according to the custom library
 	else:
+		# set outfile name early to reflect its origin from species
+		outfile = infile.replace('.fas','_' + Species + '_TE.gff')
 		cmd = 'RepeatMasker -pa ' + str(cores) + ' -no_is -lib ' + customlib + ' -x -gff -a ' + infile
 		subprocess.call(cmd,shell=True)
 	# remove all output files apart from the gff
@@ -39,12 +43,12 @@ def RepeatMaskerRunner(infile,cores=1,species='Metazoa',customlib=''):
 		if i.startswith('RM_'):
 			shutil.rmtree(i)
 	# in the gff, replace the TE RepeatMasker label ("similarity") with "exon" (so that gffread can read it)
-	cmd = 'sed s/similarity/exon/ <' + infile.replace('.fas','.fas.out.gff') + ' > ' + infile.replace('.fas','_TE.gff')
+	cmd = 'sed s/similarity/exon/ <' + infile.replace('.fas','.fas.out.gff') + ' > ' + infile.replace('.fas','_TEwithrib.gff')
 	subprocess.call(cmd,shell=True)
 	# remove the (now-redundant) initially-outputted gff
 	os.remove(infile.replace('.fas','.fas.out.gff'))
 	# screen out any annotations of rRNA
-	cmd = 'grep -v \"rRNA\" ' + infile.replace('.fas','_TE.gff') + ' > ' + infile.replace('.fas','_TE_clean.gff')
+	cmd = 'grep -v \"rRNA\" ' + infile.replace('.fas','_TEwithrib.gff') + ' > ' + outfile
 	subprocess.call(cmd,shell=True)
 	os.remove(infile.replace('.fas','_TE.gff'))
 
@@ -75,7 +79,6 @@ def RepeatModelerRunner(infile,cores=1):
 	# shutil.rmtree(RepModDir)
 	# run RepeatMasker on RepeatModeler output
 	RepeatMaskerRunner(infile=GenomeFile,cores=Cores,customlib=infile.replace('.fas','_consensi.fa.classified'))
-	subprocess.call(cmd,shell=True)
 
 
 # function to combine multiple gffs, and output non-redundant gff and fasta files
@@ -103,5 +106,5 @@ def numberer(infile):
 		outfile.write(newline)
 		outfile.close()
 
-# RepeatMaskerRunner(GenomeFile,Cores,Species)
+# RepeatMaskerRunner(infile=GenomeFile,cores=Cores,species=Species)
 RepeatModelerRunner(infile=GenomeFile,cores=Cores)
