@@ -17,10 +17,16 @@ Cores = 8
 Species = 'Metazoa'
 
 # function to run RepeatMasker on genome
-def RepeatMaskerRunner(infile,cores,species):
+def RepeatMaskerRunner(infile,cores=1,species='Metazoa',customlib=''):
 	# run RepeatMasker (NB: E.coli insert check turned off)
-	cmd = 'RepeatMasker -pa ' + str(cores) + ' -no_is -species \"' + species + '\" -x -gff -a ' + infile
-	subprocess.call(cmd,shell=True)
+	# if customlib not specified, find TEs according to species
+	if customlib=='':
+		cmd = 'RepeatMasker -pa ' + str(cores) + ' -no_is -species \"' + species + '\" -x -gff -a ' + infile
+		subprocess.call(cmd,shell=True)
+	# if a custom repeat library is specified, find TEs according to the custom library
+	else:
+		cmd = 'RepeatMasker -pa ' + str(cores) + ' -no_is -lib ' + customlib + ' -x -gff -a ' + infile
+		subprocess.call(cmd,shell=True)
 	# remove all output files apart from the gff
 	os.remove(infile.replace('.fas','.fas.align'))
 	os.remove(infile.replace('.fas','.fas.cat.gz'))
@@ -43,7 +49,7 @@ def RepeatMaskerRunner(infile,cores,species):
 	os.remove(infile.replace('.fas','_TE.gff'))
 
 # function to run RepeatModeler on genome
-def RepeatModelerRunner(infile,cores):
+def RepeatModelerRunner(infile,cores=1):
 	# # build database
 	# cmd = 'BuildDatabase -name ' + infile.strip('.fas') + ' -engine ncbi ' + infile
 	# subprocess.call(cmd,shell=True)
@@ -68,7 +74,7 @@ def RepeatModelerRunner(infile,cores):
 	# os.remove('unaligned.fa')
 	# shutil.rmtree(RepModDir)
 	# run RepeatMasker on RepeatModeler output
-	cmd = ''
+	RepeatMaskerRunner(infile=GenomeFile,cores=Cores,customlib=infile.replace('.fas','_consensi.fa.classified'))
 	subprocess.call(cmd,shell=True)
 
 
@@ -98,4 +104,4 @@ def numberer(infile):
 		outfile.close()
 
 # RepeatMaskerRunner(GenomeFile,Cores,Species)
-RepeatModelerRunner(GenomeFile,Cores)
+RepeatModelerRunner(infile=GenomeFile,cores=Cores)
