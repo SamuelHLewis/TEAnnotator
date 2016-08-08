@@ -21,15 +21,17 @@ def RepeatMaskerRunner(infile,cores=1,species='Metazoa',customlib=''):
 	# run RepeatMasker (NB: E.coli insert check turned off)
 	# if customlib not specified, find TEs according to species
 	if customlib=='':
-		# set outfile name early to reflect its origin from customlib
-		outfile = infile.replace('.fas','_customlib_TE.gff')
-		cmd = 'RepeatMasker -pa ' + str(cores) + ' -no_is -species \"' + species + '\" -x -gff -a ' + infile
+		# set outfile name early to reflect its origin from species
+		outfile = infile.replace('.fas','_' + Species + '_TE.gff')
+		cmd = 'RepeatMasker -pa ' + str(cores) + ' -no_is -species ' + species + ' -x -gff -a ' + infile
+		print('Running RepeatMasker with species library ' + species)
 		subprocess.call(cmd,shell=True)
 	# if a custom repeat library is specified, find TEs according to the custom library
 	else:
-		# set outfile name early to reflect its origin from species
-		outfile = infile.replace('.fas','_' + Species + '_TE.gff')
+		# set outfile name early to reflect its origin from customlib
+		outfile = infile.replace('.fas','_customlib_TE.gff')
 		cmd = 'RepeatMasker -pa ' + str(cores) + ' -no_is -lib ' + customlib + ' -x -gff -a ' + infile
+		print('Running RepeatMasker with custom library ' + customlib)
 		subprocess.call(cmd,shell=True)
 	# remove all output files apart from the gff
 	os.remove(infile.replace('.fas','.fas.align'))
@@ -50,33 +52,33 @@ def RepeatMaskerRunner(infile,cores=1,species='Metazoa',customlib=''):
 	# screen out any annotations of rRNA
 	cmd = 'grep -v \"rRNA\" ' + infile.replace('.fas','_TEwithrib.gff') + ' > ' + outfile
 	subprocess.call(cmd,shell=True)
-	os.remove(infile.replace('.fas','_TE.gff'))
+	os.remove(infile.replace('.fas','_TEwithrib.gff'))
 
 # function to run RepeatModeler on genome
 def RepeatModelerRunner(infile,cores=1):
-	# # build database
-	# cmd = 'BuildDatabase -name ' + infile.strip('.fas') + ' -engine ncbi ' + infile
-	# subprocess.call(cmd,shell=True)
-	# # run RepeatModeler
-	# cmd = 'RepeatModeler -engine ncbi -pa ' + str(cores) + ' -database ' + infile.strip('.fas')
-	# subprocess.call(cmd,shell=True)
-	# # move RepeatModeler output "consensi.fa" (will be in randomly-named subdir) to current directory
-	# dirs = os.listdir(path='.')
-	# for i in dirs:
-	# 	if i.startswith('RM_'):
-	# 		RepModDir = i
-	# cmd = "mv ./" + RepModDir + '/' + 'consensi.fa.classified ' + infile.replace('.fas','_consensi.fa.classified')
-	# subprocess.call(cmd,shell=True)
-	# # remove database files & RepeatModeler temp dir	
-	# os.remove(infile.replace('.fas','.nhr'))
-	# os.remove(infile.replace('.fas','.nin'))
-	# os.remove(infile.replace('.fas','.nnd'))
-	# os.remove(infile.replace('.fas','.nni'))
-	# os.remove(infile.replace('.fas','.nog'))
-	# os.remove(infile.replace('.fas','.nsq'))
-	# os.remove(infile.replace('.fas','.translation'))
-	# os.remove('unaligned.fa')
-	# shutil.rmtree(RepModDir)
+	# build database
+	cmd = 'BuildDatabase -name ' + infile.strip('.fas') + ' -engine ncbi ' + infile
+	subprocess.call(cmd,shell=True)
+	# run RepeatModeler
+	cmd = 'RepeatModeler -engine ncbi -pa ' + str(cores) + ' -database ' + infile.strip('.fas')
+	subprocess.call(cmd,shell=True)
+	# move RepeatModeler output "consensi.fa" (will be in randomly-named subdir) to current directory
+	dirs = os.listdir(path='.')
+	for i in dirs:
+		if i.startswith('RM_'):
+			RepModDir = i
+	cmd = "mv ./" + RepModDir + '/' + 'consensi.fa.classified ' + infile.replace('.fas','_consensi.fa.classified')
+	subprocess.call(cmd,shell=True)
+	# remove database files & RepeatModeler temp dir	
+	os.remove(infile.replace('.fas','.nhr'))
+	os.remove(infile.replace('.fas','.nin'))
+	os.remove(infile.replace('.fas','.nnd'))
+	os.remove(infile.replace('.fas','.nni'))
+	os.remove(infile.replace('.fas','.nog'))
+	os.remove(infile.replace('.fas','.nsq'))
+	os.remove(infile.replace('.fas','.translation'))
+	os.remove('unaligned.fa')
+	shutil.rmtree(RepModDir)
 	# run RepeatMasker on RepeatModeler output
 	RepeatMaskerRunner(infile=GenomeFile,cores=Cores,customlib=infile.replace('.fas','_consensi.fa.classified'))
 
@@ -106,5 +108,5 @@ def numberer(infile):
 		outfile.write(newline)
 		outfile.close()
 
-# RepeatMaskerRunner(infile=GenomeFile,cores=Cores,species=Species)
-RepeatModelerRunner(infile=GenomeFile,cores=Cores)
+RepeatMaskerRunner(infile=GenomeFile,cores=Cores,species=Species)
+# RepeatModelerRunner(infile=GenomeFile,cores=Cores)
