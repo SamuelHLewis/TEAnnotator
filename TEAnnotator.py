@@ -1,5 +1,5 @@
 # Script to annotate the TE content of a genome using combined RepeatMasker & RepeatModeler
-# Tested on program versions: RepeatMasker open-4.0.6, RepeatModeler open-1.0.8, RepeatScout 1.0.5, TRF 4.0.4
+# Tested on program versions: RepeatMasker open-4.0.6, RepeatModeler open-1.0.8, RepeatScout 1.0.5, TRF 4.0.4 (all of which need to be in PATH)
 
 import os
 import sys
@@ -53,6 +53,7 @@ def RepeatMaskerRunner(infile,cores=1,species='Metazoa',customlib=''):
 	cmd = 'grep -v \"rRNA\" ' + infile.replace('.fas','_TEwithrib.gff') + ' > ' + outfile
 	subprocess.call(cmd,shell=True)
 	os.remove(infile.replace('.fas','_TEwithrib.gff'))
+	return(outfile)
 
 # function to run RepeatModeler on genome
 def RepeatModelerRunner(infile,cores=1):
@@ -83,30 +84,48 @@ def RepeatModelerRunner(infile,cores=1):
 	RepeatMaskerRunner(infile=GenomeFile,cores=Cores,customlib=infile.replace('.fas','_consensi.fa.classified'))
 
 
-# function to combine multiple gffs, and output non-redundant gff and fasta files
-	# # RepeatMasker will give same elements identical names - therefore append random numbers to end of all element names to allow parsing
-	# numberer(infile.replace('.fas','_TE_clean.gff'))
-	# os.remove(infile.replace('.fas','_TE_clean.gff'))
-	# os.rename(infile.replace('.fas','_TE_clean_renamed.gff'),infile.replace('.fas','_TE_RepeatMasker.gff'))
-	# # write fasta file of TEs
-	# cmd = 'gffread ' + infile.replace('.fas','_TE.gff') + ' -g ' + infile + ' -w ' + infile.replace('.fas','_TE.fas')
-	# subprocess.call(cmd,shell=True)
+# function to combine 2 gffs, and output non-redundant gff file (and optional fasta file)
+def GffCombiner(genomefile,gff1,gff2,outputfasta=False):
+	combinedgff = genomefile.replace('.fas','_TEcombined.gff')
+	# combine gff1 & gff2 into one gff file
+	cmd = 'cat ' + gff1 + ' >> ' + combinedgff
+	subprocess.call(cmd,shell=True)
+	cmd = 'cat ' + gff2 + ' >> ' + combinedgff
+	subprocess.call(cmd,shell=True)
+	print('gff files combined')
+	# sort combined gff by chromosome & ascending order within chromosome
+	cmd = 'sortBed -i ' + combinedgff + ' > ' + combinedgff.replace('.gff','_sorted.gff')
+	subprocess.call(cmd,shell=True)
+	print('Combined gff file sorted')
+	# if specified, extract sequences corresponding to TE annotations to a fasta file (NB: this will merge overlapping annotations)
+	if outputfasta is True:
+		cmd = 'gffread ' + combinedgff.replace('.gff','_sorted.gff') + ' -g ' + genomefile + ' -w ' + genomefile.replace('.fas','_TE.fas')
+		subprocess.call(cmd,shell=True)
+	print('TE fasta file written: ' + genomefile.replace('.fas','_TE.fas'))
+	# remove temp/intermediate files
+	os.remove(genomefile + '.fai')
+	os.remove(combinedgff)
+	os.rename(combinedgff.replace('.gff','_sorted.gff'),genomefile.replace('.fas','_TE.gff'))
 
-# function to append a random number to the end of identical entries in a gff file, and output to file
-def numberer(infile):
-	for i in open(infile,'r'):
-		name = ''
-		newname = ''
-		line = i.split('\t')
-		for j in line:
-			if j.startswith('Target'):
-				temp = j.split(' ')
-				name = temp[0]
-				newname = name + '_' + str(random.randint(1,1000000000000000000000000000000000000))
-		newline = i.replace(name,newname)
-		outfile = open(infile.replace('.gff','_renamed.gff'),'a')
-		outfile.write(newline)
-		outfile.close()
 
-RepeatMaskerRunner(infile=GenomeFile,cores=Cores,species=Species)
+# RepeatMaskerRunner(infile=GenomeFile,cores=Cores,species=Species)
 # RepeatModelerRunner(infile=GenomeFile,cores=Cores)
+# GffCombiner(genomefile=GenomeFile,gff1='dmel-X_Metazoa_TE.gff',gff2='dmel-X_customlib_TE.gff',outputfasta=True)
+
+def TEAnnotator(genomefile=GenomeFile):
+	RepeatMaskerRunnerGFF = RepeatMaskerRunner(infile=GenomeFile,cores=Cores,species=Species)
+	RepeatModelerRunnerGFF = RepeatModelerRunner(infile=GenomeFile,cores=Cores)
+	GffCombiner(genomefile=GenomeFile,gff1=RepeatMaskerRunnerGFF,gff2=RepeatModelerRunnerGFF,outputfasta=True)
+
+TEAnnotator(genomefile=GenomeFile)
+
+
+
+
+
+
+
+
+
+
+
