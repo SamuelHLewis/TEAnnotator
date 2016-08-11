@@ -21,22 +21,32 @@ if GenomeFile.endswith('.fasta'):
 Cores = 8
 # species to use in RepeatMasker
 Species = 'Metazoa'
+# default cutoff value for RepeatMasker
+CutOff = 250
+# low complexity repeats included (True) or excluded (False)
+NoLow = True
 
 # function to run RepeatMasker on genome
-def RepeatMaskerRunner(infile,cores=1,species='Metazoa',customlib=''):
+def RepeatMaskerRunner(infile,cores=1,species='Metazoa',customlib='',cutoff=225,nolow=False):
 	# run RepeatMasker (NB: E.coli insert check turned off)
 	# if customlib not specified, find TEs according to species
 	if customlib=='':
 		# set outfile name early to reflect its origin from species
 		outfile = infile.replace('.fas','_' + Species + '_TE.gff')
-		cmd = 'RepeatMasker -pa ' + str(cores) + ' -no_is -species ' + species + ' -x -gff -a ' + infile + ' >> report.log'
+		if nolow is False:
+			cmd = 'RepeatMasker -pa ' + str(cores) + ' -norna -cutoff ' + str(cutoff) + ' -no_is -species ' + species + ' -x -gff -a ' + infile + ' >> report.log'
+		elif nolow is True:
+			cmd = 'RepeatMasker -pa ' + str(cores) + ' -norna -cutoff ' + str(cutoff) + ' -nolow -no_is -species ' + species + ' -x -gff -a ' + infile + ' >> report.log'
 		print('Running RepeatMasker with species library ' + species)
 		subprocess.call(cmd,shell=True)
 	# if a custom repeat library is specified, find TEs according to the custom library
 	else:
 		# set outfile name early to reflect its origin from customlib
 		outfile = infile.replace('.fas','_customlib_TE.gff')
-		cmd = 'RepeatMasker -pa ' + str(cores) + ' -no_is -lib ' + customlib + ' -x -gff -a ' + infile + ' >> report.log'
+		if nolow is False:
+			cmd = 'RepeatMasker -pa ' + str(cores) + ' -norna -cutoff ' + str(cutoff) + ' -no_is -lib ' + customlib + ' -x -gff -a ' + infile + ' >> report.log'
+		elif nolow is True:
+			cmd = 'RepeatMasker -pa ' + str(cores) + ' -norna -cutoff ' + str(cutoff) + ' -nolow -no_is -lib ' + customlib + ' -x -gff -a ' + infile + ' >> report.log'
 		print('Running RepeatMasker with custom library ' + customlib)
 		subprocess.call(cmd,shell=True)
 		os.remove(customlib)
@@ -134,7 +144,7 @@ def TEAnnotator(fastafile=GenomeFile,outputfasta=True):
 	if os.path.isfile('report.log') is True:
 		os.remove('report.log')
 	# run RepeatMasker using species set at start
-	RepeatMaskerGFF = RepeatMaskerRunner(infile=GenomeFile,cores=Cores,species=Species)
+	RepeatMaskerGFF = RepeatMaskerRunner(infile=GenomeFile,cores=Cores,species=Species,cutoff=CutOff,nolow=NoLow)
 	# run RepeatModeler on genome
 	RepeatModelerOutput = RepeatModelerRunner(infile=GenomeFile,cores=Cores)
 	if outputfasta is True:
@@ -145,7 +155,7 @@ def TEAnnotator(fastafile=GenomeFile,outputfasta=True):
 		# if RepeatModeler identified some TEs, run RepeatMasker based on the RepeatModeler de novo database, combine the RepeatMasker and RepeatModeler gff files, and extract sequences based on the combined gff file
 		else:
 			print('Running RepeatMasker based on RepeatModeler models')
-			RepeatModelerGFF = RepeatMaskerRunner(infile=GenomeFile,cores=Cores,customlib=RepeatModelerOutput)
+			RepeatModelerGFF = RepeatMaskerRunner(infile=GenomeFile,cores=Cores,customlib=RepeatModelerOutput,cutoff=CutOff,nolow=NoLow)
 			print('Combining species-based and RepeatModeler-based gff files')
 			GffCombinerGFF = GffCombiner(fastafile=GenomeFile,gff1=RepeatMaskerGFF,gff2=RepeatModelerGFF)
 			os.remove(RepeatMaskerGFF)
@@ -154,7 +164,9 @@ def TEAnnotator(fastafile=GenomeFile,outputfasta=True):
 			Extractor(fastafile=GenomeFile,gff=GffCombinerGFF)
 
 # # the important call (returns gff and optional fasta for TEs in fastafile)
-# TEAnnotator(fastafile=GenomeFile)
+TEAnnotator(fastafile=GenomeFile)
+
+
 
 
 
