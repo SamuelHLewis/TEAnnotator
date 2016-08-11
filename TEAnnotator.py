@@ -14,7 +14,7 @@ import random as random
 import shutil
 
 # input genome fasta file
-GenomeFile = 'test.fas'
+GenomeFile = 'dmel-X.fas'
 if GenomeFile.endswith('.fasta'):
 	os.rename(GenomeFile,GenomeFile.replace('.fasta','.fas'))
 # number of cores to use
@@ -92,7 +92,8 @@ def RepeatModelerRunner(infile,cores=1):
 		cmd = "mv ./" + RepModDir + '/consensi.fa.classified ' + infile.replace('.fas','_consensi.fa.classified')
 		subprocess.call(cmd,shell=True)
 		os.remove('unaligned.fa')
-		os.remove('tmpConsensi.fa.cat.all')
+		if os.path.isfile('tmpConsensi.fa.cat.all') is True:
+			os.remove('tmpConsensi.fa.cat.all')
 		shutil.rmtree(RepModDir)
 		return(infile.replace('.fas','_consensi.fa.classified'))
 	# if RepeatModeler hasn't identified any TEs, remove the temp dir and return 'No TEs found'
@@ -152,9 +153,8 @@ def TEAnnotator(fastafile=GenomeFile,outputfasta=True):
 			print('Extracting TE sequences based on combined gff')
 			Extractor(fastafile=GenomeFile,gff=GffCombinerGFF)
 
-# the important call (returns gff and optional fasta for TEs in fastafile)
-TEAnnotator(fastafile=GenomeFile)
-
+# # the important call (returns gff and optional fasta for TEs in fastafile)
+# TEAnnotator(fastafile=GenomeFile)
 
 
 
