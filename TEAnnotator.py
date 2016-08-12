@@ -13,8 +13,13 @@ import subprocess
 import random as random
 import shutil
 
+#############################################################
+##                      USER OPTIONS                       ##
+## (Change nothing else unless you know what you're doing) ##
+#############################################################
+
 # input genome fasta file
-GenomeFile = 'dmel-X.fas'
+GenomeFile = 'test.fas'
 if GenomeFile.endswith('.fasta'):
 	os.rename(GenomeFile,GenomeFile.replace('.fasta','.fas'))
 # number of cores to use
@@ -25,6 +30,13 @@ Species = 'Metazoa'
 CutOff = 250
 # low complexity repeats included (True) or excluded (False)
 NoLow = True
+# minimum length of sequence
+MinLength = 500
+
+#####################################################
+##                    CORE CODE                    ##
+## (Don't touch unless you know what you're doing) ##
+#####################################################
 
 # function to run RepeatMasker on genome
 def RepeatMaskerRunner(infile,cores=1,species='Metazoa',customlib='',cutoff=225,nolow=False):
@@ -139,7 +151,7 @@ def Extractor(fastafile,gff):
 	os.remove(fastafile + '.fai')
 
 # function to apply a length screen to a gff file
-def GFFLengthScreener(gff,minlength=0,maxlength=float('inf')):
+def GffLengthScreener(gff,minlength=0,maxlength=float('inf')):
 	ScreenedGff = ''
 	counter = 0
 	included = 0
@@ -156,6 +168,7 @@ def GFFLengthScreener(gff,minlength=0,maxlength=float('inf')):
 	outfile.write(ScreenedGff)
 	outfile.close()
 	print('New gff written: ' + str(included) + '/' + str(counter) + ' annotations passed length filter')
+	return(gff.replace('.gff','_screened.gff'))
 
 # function to annotate TEs in a fasta file (usually a genome) using RepeatMasker & RepeatModeler - produces gff by default and additional (optional) fasta
 def TEAnnotator(fastafile=GenomeFile,outputfasta=True):
@@ -167,10 +180,13 @@ def TEAnnotator(fastafile=GenomeFile,outputfasta=True):
 	# run RepeatModeler on genome
 	RepeatModelerOutput = RepeatModelerRunner(infile=GenomeFile,cores=Cores)
 	if outputfasta is True:
-		# if RepeatModeler identified no TEs, extract sequences based on the RepeatMasker gff file
+		# if RepeatModeler identified no TEs, extract sequences based on the length-screened RepeatMasker gff file
 		if RepeatModelerOutput == 'No TEs found':
-			print('No TEs found by RepeatModeler - extracting TE sequences based on species-based gff')
-			Extractor(fastafile=GenomeFile,gff=RepeatMaskerGFF)
+			print('No TEs found by RepeatModeler - extracting TE sequences based on length-screened species-based gff')
+			# screen out TE annotations by length
+			FinalGff = GffLengthScreener(gff=RepeatMaskerGFF,minlength=MinLength)
+			os.remove(RepeatMaskerGFF)
+			Extractor(fastafile=GenomeFile,gff=FinalGff)
 		# if RepeatModeler identified some TEs, run RepeatMasker based on the RepeatModeler de novo database, combine the RepeatMasker and RepeatModeler gff files, and extract sequences based on the combined gff file
 		else:
 			print('Running RepeatMasker based on RepeatModeler models')
@@ -179,13 +195,15 @@ def TEAnnotator(fastafile=GenomeFile,outputfasta=True):
 			GffCombinerGFF = GffCombiner(fastafile=GenomeFile,gff1=RepeatMaskerGFF,gff2=RepeatModelerGFF)
 			os.remove(RepeatMaskerGFF)
 			os.remove(RepeatModelerGFF)
-			print('Extracting TE sequences based on combined gff')
-			Extractor(fastafile=GenomeFile,gff=GffCombinerGFF)
+			# screen out TE annotations by length
+			FinalGff = GffLengthScreener(gff=GffCombinerGFF,minlength=MinLength)
+			print('Extracting TE sequences based on length-screened combined gff')
+			os.remove(GffCombinerGFF)
+			Extractor(fastafile=GenomeFile,gff=FinalGff)
+	
 
-# # the important call (returns gff and optional fasta for TEs in fastafile)
-# TEAnnotator(fastafile=GenomeFile)
-
-GFFLengthScreener(gff='dmel-X_TE_NoLow250.gff',minlength=1000)
+# the important call (returns gff and optional fasta for TEs in fastafile)
+TEAnnotator(fastafile=GenomeFile)
 
 
 
