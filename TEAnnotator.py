@@ -138,6 +138,25 @@ def Extractor(fastafile,gff):
 	# remove temp/intermediate files
 	os.remove(fastafile + '.fai')
 
+# function to apply a length screen to a gff file
+def GFFLengthScreener(gff,minlength=0,maxlength=float('inf')):
+	ScreenedGff = ''
+	counter = 0
+	included = 0
+	for line in open(gff,'r'):
+		counter += 1
+		start = int(line.split('\t')[3])
+		end = int(line.split('\t')[4])
+		# NB +1 here to include all bases of annotation
+		length = end-start+1
+		if minlength < length < maxlength:
+			ScreenedGff += line
+			included += 1
+	outfile = open(gff.replace('.gff','_screened.gff'),'wt')
+	outfile.write(ScreenedGff)
+	outfile.close()
+	print('New gff written: ' + str(included) + '/' + str(counter) + ' annotations passed length filter')
+
 # function to annotate TEs in a fasta file (usually a genome) using RepeatMasker & RepeatModeler - produces gff by default and additional (optional) fasta
 def TEAnnotator(fastafile=GenomeFile,outputfasta=True):
 	# remove report logfile if already exists
@@ -164,7 +183,9 @@ def TEAnnotator(fastafile=GenomeFile,outputfasta=True):
 			Extractor(fastafile=GenomeFile,gff=GffCombinerGFF)
 
 # # the important call (returns gff and optional fasta for TEs in fastafile)
-TEAnnotator(fastafile=GenomeFile)
+# TEAnnotator(fastafile=GenomeFile)
+
+GFFLengthScreener(gff='dmel-X_TE_NoLow250.gff',minlength=1000)
 
 
 
