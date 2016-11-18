@@ -12,26 +12,97 @@ import sys
 import subprocess
 import random as random
 import shutil
+import re
 
-#############################################################
-##                      USER OPTIONS                       ##
-## (Change nothing else unless you know what you're doing) ##
-#############################################################
+import argparse
 
+#############################
+## DEFAULT ARGUMENT VALUES ##
+#############################
 # input genome fasta file
-GenomeFile = 'test.fas'
-if GenomeFile.endswith('.fasta'):
-	os.rename(GenomeFile,GenomeFile.replace('.fasta','.fas'))
+GenomeFile = ''
 # number of cores to use
-Cores = 8
+Cores = 1
 # species to use in RepeatMasker
 Species = 'Metazoa'
 # default cutoff value for RepeatMasker
 CutOff = 250
-# low complexity repeats included (True) or excluded (False)
-NoLow = True
-# minimum length of sequence
+# minimum length of repeat annotation
 MinLength = 500
+# low complexity repeats excluded (True) or included (False)
+NoLow = True
+
+###########################
+## USER ARGUMENT PARSING ##
+###########################
+parser = argparse.ArgumentParser(description='Read arguments')
+parser.add_argument('-i', '--infile', type=str, help='input fasta file')
+parser.add_argument('-c', '--cores',  type=int, help='number of cores')
+parser.add_argument('-s', '--species',  type=str, help='species to use for RepeatMasker')
+parser.add_argument('-u', '--cutoff',  type=int, help='cutoff value for RepeatMasker')
+parser.add_argument('-m', '--minlength',  type=int, help='minimum length of repeat annotation')
+parser.add_argument('--lowcomplex', help='include low complexity repeats', action="store_true")
+args = parser.parse_args()
+# input fasta file parsing
+GenomeFile = args.infile
+if GenomeFile != '':
+	if GenomeFile.endswith('.fas'):
+		print('Input file is ' + GenomeFile)
+	elif GenomeFile.endswith('.fasta'):
+#		os.rename(GenomeFile,GenomeFile.replace('.fasta','.fas'))
+		GenomeFile = GenomeFile.replace('.fasta','.fas')
+		print('Input file renamed to ' + GenomeFile)
+	elif GenomeFile.endswith('.fa'):
+#		os.rename(GenomeFile,GenomeFile.replace('.fa','.fas'))
+		GenomeFile = GenomeFile.replace('.fa','.fas')
+		print('Input file renamed to ' + GenomeFile)
+	else:
+		print('Input file does not have normal fasta filename ending - please check file format')
+		sys.exit(0)
+else:
+	print('ERROR: no input file specified')
+# cores parsing
+if args.cores is None:
+	print('Using default number of cores (' + str(Cores) + ')')
+else:
+	Cores = args.cores
+	if Cores > 0:
+		print(str(Cores) + ' cores specified')
+	else:
+		print('ERROR: 1 or more cores (-c) required')
+		sys.exit(0)
+# species parsing
+if args.species is None:
+	print('Using default species (' + Species + ')')
+else:
+	Species = args.species
+	print('RepeatMasker species set to ' + Species)
+# cutoff value parsing
+if args.cutoff is None:
+	print('Using default RepeatMasker cutoff value (' + str(CutOff) + ')')
+else:
+	if args.cutoff > 0:
+		CutOff = args.cutoff
+		print('RepeatMasker cutoff value set to ' + str(CutOff))
+	else:
+		print('ERROR: cutoff value (-u) must be higher than 0')
+		sys.exit(0)
+# minimum annotation length parsing
+if args.minlength is None:
+	print('Using default minimum annotation length (' + str(MinLength) + ')')
+else:
+	if args.minlength > 0:
+		MinLength = args.minlength
+		print('Minimum annotation length set to ' + str(MinLength))
+	else:
+		print('ERROR: minimum annotation length (-m) must be more than 0')
+		sys.exit(0)
+# low complexity repeat handling parsing
+if args.lowcomplex:
+	NoLow = False
+	print('Including low complexity repeats')
+else:
+	print('Excluding low complexity repeats')
 
 #####################################################
 ##                    CORE CODE                    ##
@@ -39,88 +110,151 @@ MinLength = 500
 #####################################################
 
 # function to run RepeatMasker on genome
-def RepeatMaskerRunner(infile,cores=1,species='Metazoa',customlib='',cutoff=225,nolow=False):
+def RepeatMaskerRunner(infile,cores=1,species='Metazoa',customlib='',cutoff=225,nolow=True):
 	# run RepeatMasker (NB: E.coli insert check turned off)
 	# if customlib not specified, find TEs according to species
 	if customlib=='':
 		# set outfile name early to reflect its origin from species
 		outfile = infile.replace('.fas','_' + Species + '_TE.gff')
 		if nolow is False:
-			cmd = 'RepeatMasker -pa ' + str(cores) + ' -norna -cutoff ' + str(cutoff) + ' -no_is -species ' + species + ' -x -gff -a ' + infile + ' >> report.log'
+			cmd = 'RepeatMasker -pa ' + str(cores) + ' -norna -cutoff ' + str(cutoff) + ' -no_is -species ' + species + ' -x -gff -a ' + infile
 		elif nolow is True:
-			cmd = 'RepeatMasker -pa ' + str(cores) + ' -norna -cutoff ' + str(cutoff) + ' -nolow -no_is -species ' + species + ' -x -gff -a ' + infile + ' >> report.log'
+			cmd = 'RepeatMasker -pa ' + str(cores) + ' -norna -cutoff ' + str(cutoff) + ' -nolow -no_is -species ' + species + ' -x -gff -a ' + infile
 		print('Running RepeatMasker with species library ' + species)
 		subprocess.call(cmd,shell=True)
+		# make a new dir in TEAnnotator to put the tempfiles into
+		tempdir = 'TEAnnotator/'+Species+'/'
+		if os.path.isdir(tempdir) is True:
+			shutil.rmtree(tempdir)
+			print('Old ' + tempdir + ' removed')
+		os.makedirs(tempdir)
+		# move all output files apart from gff to species-specific dir in TEAnnotator/
+		dirs = os.listdir(path='.')
+		for i in dirs:
+			if i.startswith('RM_'):
+				# RepeatMaskerDir = i.split('/')[-2]
+				# shutil.move(RepeatMaskerDir,tempdir+RepeatMaskerDir)
+				None
+			else:
+				filename = os.path.split(i)[1]
+				if filename.endswith('.fas.align'):
+					shutil.move(filename,tempdir+filename)
+				elif filename.endswith('.fas.cat'):
+					shutil.move(filename,tempdir+filename)
+				elif filename.endswith('.fas.cat.gz'):
+					shutil.move(filename,tempdir+filename)
+				elif filename.endswith('.fas.masked'):
+					shutil.move(filename,tempdir+filename)
+				elif filename.endswith('.fas.out'):
+					shutil.move(filename,tempdir+filename)
+				elif filename.endswith('.fas.tbl'):
+					shutil.move(filename,tempdir+filename)
 	# if a custom repeat library is specified, find TEs according to the custom library
 	else:
 		# set outfile name early to reflect its origin from customlib
 		outfile = infile.replace('.fas','_customlib_TE.gff')
 		if nolow is False:
-			cmd = 'RepeatMasker -pa ' + str(cores) + ' -norna -cutoff ' + str(cutoff) + ' -no_is -lib ' + customlib + ' -x -gff -a ' + infile + ' >> report.log'
+			cmd = 'RepeatMasker -pa ' + str(cores) + ' -norna -cutoff ' + str(cutoff) + ' -no_is -lib ' + customlib + ' -x -gff -a ' + infile
 		elif nolow is True:
-			cmd = 'RepeatMasker -pa ' + str(cores) + ' -norna -cutoff ' + str(cutoff) + ' -nolow -no_is -lib ' + customlib + ' -x -gff -a ' + infile + ' >> report.log'
+			cmd = 'RepeatMasker -pa ' + str(cores) + ' -norna -cutoff ' + str(cutoff) + ' -nolow -no_is -lib ' + customlib + ' -x -gff -a ' + infile
 		print('Running RepeatMasker with custom library ' + customlib)
 		subprocess.call(cmd,shell=True)
-		os.remove(customlib)
-	# remove all output files apart from the gff
-	os.remove(infile.replace('.fas','.fas.align'))
-	os.remove(infile.replace('.fas','.fas.masked'))
-	os.remove(infile.replace('.fas','.fas.out'))
-	os.remove(infile.replace('.fas','.fas.tbl'))
-	# check whether the .cat file has been compressed or not before removing
-	if os.path.isfile(infile.replace('.fas','.fas.cat.gz')) is True:
-		os.remove(infile.replace('.fas','.fas.cat.gz'))
-	if os.path.isfile(infile.replace('.fas','.fas.cat')) is True:
-		os.remove(infile.replace('.fas','.fas.cat'))	
-	# this removes the RepeatMasker temp dir
-	dirs = os.listdir(path='.')
-	for i in dirs:
-		if i.startswith('RM_'):
-			shutil.rmtree(i)
-	# in the gff, replace the TE RepeatMasker label ("similarity") with "exon" (so that gffread can read it)
-	cmd = 'sed s/similarity/exon/ <' + infile.replace('.fas','.fas.out.gff') + ' > ' + infile.replace('.fas','_TEwithrib.gff')
-	subprocess.call(cmd,shell=True)
-	# remove the (now-redundant) initially-outputted gff
-	os.remove(infile.replace('.fas','.fas.out.gff'))
-	# screen out any annotations of rRNA
-	cmd = 'grep -v \"rRNA\" ' + infile.replace('.fas','_TEwithrib.gff') + ' > ' + outfile
-	subprocess.call(cmd,shell=True)
-	os.remove(infile.replace('.fas','_TEwithrib.gff'))
+		# make a new dir in TEAnnotator to put the tempfiles into
+		tempdir = 'TEAnnotator/Custom/'
+		if os.path.isdir(tempdir) is True:
+			shutil.rmtree(tempdir)
+			print('Old ' + tempdir + ' removed')
+		os.makedirs(tempdir)
+		# move all output files apart from gff to Custom dir in TEAnnotator/
+		dirs = os.listdir(path='.')
+		for i in dirs:
+			if i.startswith('RM_'):
+				RepeatMaskerDir = i.split('/')[-2]
+				shutil.move(RepeatMaskerDir,tempdir+RepeatMaskerDir)
+			else:
+				filename = os.path.split(i)[1]
+				if filename.endswith('.fas.align'):
+					shutil.move(filename,tempdir+filename)
+				elif filename.endswith('.fas.cat'):
+					shutil.move(filename,tempdir+filename)
+				elif filename.endswith('.fas.cat.gz'):
+					shutil.move(filename,tempdir+filename)
+				elif filename.endswith('.fas.masked'):
+					shutil.move(filename,tempdir+filename)
+				elif filename.endswith('.fas.out'):
+					shutil.move(filename,tempdir+filename)
+				elif filename.endswith('.fas.tbl'):
+					shutil.move(filename,tempdir+filename)
+	# in the gff, give each annotation a unique name based on start-end positions, and replace the TE RepeatMasker label ("similarity") with "CDS" (so that gffread can extract coding seqs)
+	newgffcontents = ''
+	for line in open(infile.replace('.fas','.fas.out.gff')):	
+		if line.startswith('#'):
+			None
+		else:
+			linesplit = line.split('\t')
+			TEname = linesplit[8].replace('Target \"Motif:','ID=').replace('\"','').replace(' ','_').strip('\n')
+			if re.search('rRNA',TEname) == None:
+				newline = linesplit[0] + '\t' + linesplit[1] + '\t' + 'CDS' + '\t' + linesplit[3] + '\t' + linesplit[4] + '\t' + linesplit[5] + '\t' + linesplit[6] + '\t' + linesplit[7] + '\t' + TEname + '\n'
+				newgffcontents += newline
+	newgff = open(outfile,'wt')
+	newgff.write(newgffcontents)
+	newgff.close()
 	return(outfile)
 
 # function to run RepeatModeler on genome
 def RepeatModelerRunner(infile,cores=1):
 	# build database
-	cmd = 'BuildDatabase -name ' + infile.strip('.fas') + ' -engine ncbi ' + infile + ' >> report.log'
+	cmd = 'BuildDatabase -name ' + infile.strip('.fas') + ' -engine ncbi ' + infile
 	subprocess.call(cmd,shell=True)
 	# run RepeatModeler
-	cmd = 'RepeatModeler -engine ncbi -pa ' + str(cores) + ' -database ' + infile.strip('.fas') + ' >> report.log'
+	cmd = 'RepeatModeler -engine ncbi -pa ' + str(cores) + ' -database ' + infile.strip('.fas')
 	subprocess.call(cmd,shell=True)
-	# move RepeatModeler output "consensi.fa" (will be in randomly-named subdir) to current directory
+	# make a new dir in TEAnnotator to put the tempfiles into
+	tempdir = 'TEAnnotator/RepeatModeler/'
+	if os.path.isdir(tempdir) is True:
+		shutil.rmtree(tempdir)
+		print('Old ' + tempdir + ' removed')
+	os.makedirs(tempdir)
 	dirs = os.listdir(path='.')
 	for i in dirs:
+		# identify the RepeatModeler dir
 		if i.startswith('RM_'):
 			RepModDir = i
-	# remove database files	
-	os.remove(infile.replace('.fas','.nhr'))
-	os.remove(infile.replace('.fas','.nin'))
-	os.remove(infile.replace('.fas','.nnd'))
-	os.remove(infile.replace('.fas','.nni'))
-	os.remove(infile.replace('.fas','.nog'))
-	os.remove(infile.replace('.fas','.nsq'))
-	os.remove(infile.replace('.fas','.translation'))
-	# if RepeatModeler has identified some TEs, move the RepBase-formatted file into the working directory and rename it, remove the other intermediate files & temp dir, and return 'TEs found'
+		# move database indexing files to TEAnnotator/RepeatModeler/ dir 
+		else:
+			filename = os.path.split(i)[1]
+			if filename.endswith('.nhr'):
+				shutil.move(filename,tempdir+filename)
+			elif filename.endswith('.nin'):
+				shutil.move(filename,tempdir+filename)
+			elif filename.endswith('.nnd'):
+				shutil.move(filename,tempdir+filename)
+			elif filename.endswith('.nni'):
+				shutil.move(filename,tempdir+filename)
+			elif filename.endswith('.nog'):
+				shutil.move(filename,tempdir+filename)
+			elif filename.endswith('.nsq'):
+				shutil.move(filename,tempdir+filename)
+			elif filename.endswith('.translation'):
+				shutil.move(filename,tempdir+filename)
+	# if RepeatModeler has identified some TEs, move the RepBase-formatted file ("consensi.fa" in randomly-named subdir) into the working directory and rename it, remove the other intermediate files & temp dir, and return 'TEs found'
 	if os.path.isfile('./' + RepModDir + '/consensi.fa.classified') is True:
 		cmd = "mv ./" + RepModDir + '/consensi.fa.classified ' + infile.replace('.fas','_consensi.fa.classified')
 		subprocess.call(cmd,shell=True)
-		os.remove('unaligned.fa')
-		if os.path.isfile('tmpConsensi.fa.cat.all') is True:
-			os.remove('tmpConsensi.fa.cat.all')
-		shutil.rmtree(RepModDir)
+		dirs = os.listdir(path='.')
+		for i in dirs:
+			filename = os.path.split(i)[1]
+			if filename.endswith('unaligned.fa'):
+				shutil.move(filename,tempdir+filename)
+			elif filename.endswith('tmpConsensi.fa.cat.all'):
+				shutil.move(filename,tempdir+filename)
+		# move the RepeatModeler temp dir into the overall tempfile dir
+		shutil.move(RepModDir,tempdir+RepModDir)
 		return(infile.replace('.fas','_consensi.fa.classified'))
 	# if RepeatModeler hasn't identified any TEs, remove the temp dir and return 'No TEs found'
 	else:
-		shutil.rmtree(RepModDir)
+		# move the RepeatModeler temp dir into the overall tempfile dir
+		shutil.move(RepModDir,tempdir+RepModDir)
 		return('No TEs found')
 
 # function to combine 2 gffs, and output non-redundant gff file
@@ -144,7 +278,7 @@ def GffCombiner(fastafile,gff1,gff2):
 # function to extract sequences from fasta file according to annotations in gff file
 def Extractor(fastafile,gff):
 	# extract sequences corresponding to gff annotations to a fasta file (NB: this will merge overlapping annotations)
-	cmd = 'gffread ' + gff + ' -g ' + fastafile + ' -w ' + fastafile.replace('.fas','_TE.fas')
+	cmd = 'gffread -E -C ' + gff + ' -g ' + fastafile + ' -w ' + fastafile.replace('.fas','_TE.fas')
 	subprocess.call(cmd,shell=True)
 	print('Fasta file written: ' + fastafile.replace('.fas','_TE.fas'))
 	# remove temp/intermediate files
@@ -172,9 +306,11 @@ def GffLengthScreener(gff,minlength=0,maxlength=float('inf')):
 
 # function to annotate TEs in a fasta file (usually a genome) using RepeatMasker & RepeatModeler - produces gff by default and additional (optional) fasta
 def TEAnnotator(fastafile=GenomeFile,outputfasta=True):
-	# remove report logfile if already exists
-	if os.path.isfile('report.log') is True:
-		os.remove('report.log')
+	# remove TEAnnotator dir if already exists and replace it with new (blank) dir
+	if os.path.isdir('TEAnnotator') is True:
+		shutil.rmtree('TEAnnotator')
+		print('Old TEAnnotator tempfiles removed')
+	os.makedirs('TEAnnotator')
 	# run RepeatMasker using species set at start
 	RepeatMaskerGFF = RepeatMaskerRunner(infile=GenomeFile,cores=Cores,species=Species,cutoff=CutOff,nolow=NoLow)
 	# run RepeatModeler on genome
@@ -200,18 +336,7 @@ def TEAnnotator(fastafile=GenomeFile,outputfasta=True):
 			print('Extracting TE sequences based on length-screened combined gff')
 			os.remove(GffCombinerGFF)
 			Extractor(fastafile=GenomeFile,gff=FinalGff)
-	
 
-# the important call (returns gff and optional fasta for TEs in fastafile)
+# find TEs in genome
 TEAnnotator(fastafile=GenomeFile)
-
-
-
-
-
-
-
-
-
-
 
