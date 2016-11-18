@@ -14,9 +14,7 @@ Basic usage is:
 ```bash
 python3 TEAnnotator.py -i input.fas
 ```
-TEAnnotator accepts the following arguments (all of which have defaults already set):
-
--i (input fasta file)
+TEAnnotator accepts the following additional arguments (all of which have defaults already set):
 
 -c (number of cores)
 
