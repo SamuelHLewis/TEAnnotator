@@ -45,7 +45,7 @@ parser.add_argument('--lowcomplex', help='include low complexity repeats', actio
 args = parser.parse_args()
 # input fasta file parsing
 GenomeFile = args.infile
-if GenomeFile != '':
+if GenomeFile is not None:
 	if GenomeFile.endswith('.fas'):
 		print('Input file is ' + GenomeFile)
 	elif GenomeFile.endswith('.fasta'):
