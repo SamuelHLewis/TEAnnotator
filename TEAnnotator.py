@@ -277,8 +277,8 @@ def GffCombiner(fastafile,gff1,gff2):
 
 # function to extract sequences from fasta file according to annotations in gff file
 def Extractor(fastafile,gff):
-	# extract sequences corresponding to gff annotations to a fasta file (NB: this will merge overlapping annotations)
-	cmd = 'gffread -E -C ' + gff + ' -g ' + fastafile + ' -w ' + fastafile.replace('.fas','_TE.fas')
+	# extract sequences corresponding to gff annotations to a fasta file (NB: this forces strandedness i.e. reverse-complements annotations on the antisense strand)
+	cmd = 'bedtools getfasta -s -fo ' + fastafile.replace('.fas','_TE.fas') + ' -fi ' + fastafile + ' -bed ' + gff
 	subprocess.call(cmd,shell=True)
 	print('Fasta file written: ' + fastafile.replace('.fas','_TE.fas'))
 	# remove temp/intermediate files
