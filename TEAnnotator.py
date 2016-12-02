@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 # This annotates the TE content of a genome using a combination of RepeatMasker & RepeatModeler methods
 # Dependencies (all of which need to be in PATH): 
 	# RepeatMasker open-4.0.6
