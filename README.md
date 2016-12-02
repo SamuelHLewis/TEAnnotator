@@ -12,7 +12,7 @@ RepeatModeler v1.0.8 or later (and its dependencies)
 # Usage
 Basic usage is:
 ```bash
-python3 TEAnnotator.py -i input.fas
+TEAnnotator.py -i input.fas
 ```
 TEAnnotator accepts the following additional arguments (all of which have defaults already set):
 
