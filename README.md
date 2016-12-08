@@ -6,9 +6,9 @@ Written in python3.
 
 Requires:
 
-RepeatMasker v4.0.6 or later (and its dependencies)
+[RepeatMasker](http://repeatmasker.org/RMDownload.html) v4.0.6 or later (and its dependencies)
 
-RepeatModeler v1.0.8 or later (and its dependencies)
+[RepeatModeler](http://repeatmasker.org/RepeatModeler.html) v1.0.8 or later (and its dependencies)
 # Usage
 Basic usage is:
 ```bash
